@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36811.4 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "sprh", "sprh.csproj", "{2246D99C-F696-4035-B6DC-D9F4186141FD}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2246D99C-F696-4035-B6DC-D9F4186141FD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2246D99C-F696-4035-B6DC-D9F4186141FD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2246D99C-F696-4035-B6DC-D9F4186141FD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2246D99C-F696-4035-B6DC-D9F4186141FD}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {AA9BB734-095C-40FF-A2EA-8C757F5B8F16}
+	EndGlobalSection
+EndGlobal
