@@ -7,12 +7,6 @@ using System.Threading;
 
 namespace sprh
 {
-    /// <summary>
-    /// SPRH 语言到 C++ 的编译器。
-    /// 将 SPRH 指令序列编译为直接执行的 C++ 代码（无解释循环）。
-    /// 兼容 SPRH 2.0 新特性：缓冲区大小可调（BUFSIZE=512），
-    /// 支持按位运算、栈操作、文件操作等扩展指令。
-    /// </summary>
     public class SprhToCppCompiler
     {
 
