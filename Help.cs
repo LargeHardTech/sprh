@@ -220,7 +220,7 @@ namespace sprh
             Console.WriteLine("参数可以是十六进制数字（0-9 A-F a-f）或特定符号（见下表）。");
             Console.WriteLine("注释使用 /* ... */，不支持嵌套，编译器会忽略注释内容。");
             Console.WriteLine();
-
+            
             NextPage();
             Console.WriteLine("【指令详表】");
             Console.WriteLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
