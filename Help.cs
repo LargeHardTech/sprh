@@ -24,7 +24,7 @@ namespace sprh
             Console.WriteLine("  • Poor Readability – 代码可读性差（类似 Brainfuck）");
             Console.WriteLine("  • Hard         – 编程难度高（锻炼思维）");
             Console.WriteLine();
-            Console.WriteLine($"当前版本：{Program.version}　　缓冲区大小：{Program.bufsize}×{Program.bufsize}");
+            Console.WriteLine($"当前版本：{Program.version}　　缓冲区大小：{Interpreter.bufsize} × {Interpreter.bufsize}");
             Console.WriteLine("作者：巨硬科技LHT");
             Console.WriteLine();
 
@@ -58,16 +58,21 @@ namespace sprh
             Console.WriteLine("   D*    Y 增加 *（向下）");
             Console.WriteLine("   L*    X 减少 *（向左）");
             Console.WriteLine("   R*    X 增加 *（向右）");
-            Console.WriteLine("   * 为十六进制数（1~F），移动后自动检查边界。");
+            Console.WriteLine("   * 可为十六进制数（0~F）、'v'（按变量值移动）或 '?'（随机移动）。");
+            Console.WriteLine("   使用 'v' 时移动距离等于变量 variable 当前值；");
+            Console.WriteLine("   使用 '?' 时向上/左可移动 1~当前坐标，向下/右可移动 1~剩余空间。");
+            Console.WriteLine("   非严格模式下越界会自动移动到边界，严格模式则会报错。");
             Console.WriteLine();
 
             Console.WriteLine("2. 算术运算（修改当前单元格的值）");
-            Console.WriteLine("   +*    当前值加 *（十六进制）");
-            Console.WriteLine("   -*    当前值减 *（十六进制）");
+            Console.WriteLine("   +*    当前值加 *（十六进制，0~F）");
+            Console.WriteLine("   -*    当前值减 *（十六进制，0~F）");
             Console.WriteLine("   **    当前值乘 *（十六进制）");
             Console.WriteLine("   /*    当前值除以 *（十六进制，*≠0）");
             Console.WriteLine("   ++    将当前单元格设为 255");
             Console.WriteLine("   --    将当前单元格设为 0");
+            Console.WriteLine("   +?    随机增加（至少加1，不超过255，满则警告）");
+            Console.WriteLine("   -?    随机减少（至少减1，不小于0，空则警告）");
             Console.WriteLine();
 
             NextPage();
@@ -87,6 +92,7 @@ namespace sprh
             Console.WriteLine("   V-    variable -= 当前单元格的值");
             Console.WriteLine("   V*    variable *= 当前单元格的值");
             Console.WriteLine("   V/    variable /= 当前单元格的值（除数不能为0）");
+            Console.WriteLine("   V?    将 variable 设为随机值（0~255）");
             Console.WriteLine();
 
             NextPage();
@@ -182,6 +188,7 @@ namespace sprh
             Console.WriteLine("\n--- 按任意键退出帮助 ---");
             Console.ReadKey(true);
         }
+
         public static void helpNoInp()
         {
             Console.WriteLine("═══════════════════════════════════════════");
@@ -195,7 +202,7 @@ namespace sprh
             Console.WriteLine("  • Poor Readability – 代码可读性差（类似 Brainfuck）");
             Console.WriteLine("  • Hard         – 编程难度高（锻炼思维）");
             Console.WriteLine();
-            Console.WriteLine($"当前版本：{Program.version}　　缓冲区大小：{Program.bufsize}×{Program.bufsize}");
+            Console.WriteLine($"当前版本：{Program.version}　　缓冲区大小：{Interpreter.bufsize} × {Interpreter.bufsize}");
             Console.WriteLine("作者：巨硬科技LHT");
             Console.WriteLine();
 
@@ -220,7 +227,7 @@ namespace sprh
             Console.WriteLine("参数可以是十六进制数字（0-9 A-F a-f）或特定符号（见下表）。");
             Console.WriteLine("注释使用 /* ... */，不支持嵌套，编译器会忽略注释内容。");
             Console.WriteLine();
-            
+
             NextPage();
             Console.WriteLine("【指令详表】");
             Console.WriteLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -229,16 +236,21 @@ namespace sprh
             Console.WriteLine("   D*    Y 增加 *（向下）");
             Console.WriteLine("   L*    X 减少 *（向左）");
             Console.WriteLine("   R*    X 增加 *（向右）");
-            Console.WriteLine("   * 为十六进制数（1~F），移动后自动检查边界。");
+            Console.WriteLine("   * 可为十六进制数（0~F）、'v'（按变量值移动）或 '?'（随机移动）。");
+            Console.WriteLine("   使用 'v' 时移动距离等于变量 variable 当前值；");
+            Console.WriteLine("   使用 '?' 时向上/左可移动 1~当前坐标，向下/右可移动 1~剩余空间。");
+            Console.WriteLine("   非严格模式下越界会自动移动到边界，严格模式则会报错。");
             Console.WriteLine();
 
             Console.WriteLine("2. 算术运算（修改当前单元格的值）");
-            Console.WriteLine("   +*    当前值加 *（十六进制）");
-            Console.WriteLine("   -*    当前值减 *（十六进制）");
+            Console.WriteLine("   +*    当前值加 *（十六进制，0~F）");
+            Console.WriteLine("   -*    当前值减 *（十六进制，0~F）");
             Console.WriteLine("   **    当前值乘 *（十六进制）");
             Console.WriteLine("   /*    当前值除以 *（十六进制，*≠0）");
             Console.WriteLine("   ++    将当前单元格设为 255");
             Console.WriteLine("   --    将当前单元格设为 0");
+            Console.WriteLine("   +?    随机增加（至少加1，不超过255，满则警告）");
+            Console.WriteLine("   -?    随机减少（至少减1，不小于0，空则警告）");
             Console.WriteLine();
 
             Console.WriteLine("【指令详表】");
@@ -256,6 +268,7 @@ namespace sprh
             Console.WriteLine("   V-    variable -= 当前单元格的值");
             Console.WriteLine("   V*    variable *= 当前单元格的值");
             Console.WriteLine("   V/    variable /= 当前单元格的值（除数不能为0）");
+            Console.WriteLine("   V?    将 variable 设为随机值（0~255）");
             Console.WriteLine();
 
 

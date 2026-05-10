@@ -51,7 +51,8 @@ namespace sprh
             Log("源代码生成完成。");
 
             Log("正在写入文件...");
-            File.WriteAllText(cppFilePath, cppSource, Encoding.Default);
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            File.WriteAllText(cppFilePath, cppSource, Encoding.GetEncoding("GBK"));
             Log("写入完成。");
         }
 
@@ -121,6 +122,7 @@ namespace sprh
             sb.AppendLine("#include <cstring>");
             sb.AppendLine("#include <cstdio>");
             sb.AppendLine("#include <clocale>");
+            sb.AppendLine("#include <ctime>");
             sb.AppendLine("#ifdef _WIN32");
             sb.AppendLine("#include <conio.h>");
             sb.AppendLine("#define GETCH() _getche()");
@@ -178,7 +180,9 @@ namespace sprh
             for (int i = 0; i < instructions.Count; i++)
                 labels[i] = $"L{i}";
 
-            sb.AppendLine("int main() {");
+            sb.AppendLine("int main() {int ch;");
+
+            sb.AppendLine("    srand((unsigned)time(0)); // 初始化随机数种子");
             sb.AppendLine("#ifdef _WIN32");
             sb.AppendLine("    system(\"chcp 65001 > nul\");");
             sb.AppendLine("#endif");
@@ -226,6 +230,7 @@ namespace sprh
 
         private bool GenerateInstructionCode(StringBuilder sb, char cmd, char param, int idx, string[] labels, Dictionary<int, int> jumpPairs)
         {
+
             if (cmd == '[' || cmd == '{' || cmd == '(')
             {
                 char dir = char.ToLower(param);
@@ -267,6 +272,14 @@ namespace sprh
                 sb.AppendLine($"    if ({condition}) goto {labels[targetIdx]};");
                 return true;
             }
+
+            // 移动指令 U/D/L/R 现在可以接受十六进制、v、?
+            char lowerCmd = char.ToLower(cmd);
+            if (lowerCmd == 'u' || lowerCmd == 'd' || lowerCmd == 'l' || lowerCmd == 'r')
+            {
+                return GenerateMoveInstruction(sb, cmd, param, idx);
+            }
+
             if (IsHexInstruction(cmd))
             {
                 sb.AppendLine($"    {{");
@@ -274,36 +287,8 @@ namespace sprh
                 sb.AppendLine($"        if (val == -1) runtime_error(\"参数不是十六进制数\", {idx}, '{cmd}', '{param}');");
                 if (_options.Debug) sb.AppendLine($"        std::cerr << \"[Log] 参数:\" << '{param}' << std::endl;");
 
-                switch (cmd)
+                switch (lowerCmd)
                 {
-                    case 'U':
-                    case 'u':
-                        sb.AppendLine($"        y -= val;");
-                        sb.AppendLine($"        if (y < 0) runtime_error(\"缓冲区溢出\", {idx}, '{cmd}', '{param}');");
-                        break;
-                    case 'D':
-                    case 'd':
-                        sb.AppendLine($"        y += val;");
-                        sb.AppendLine($"        if (y >= BUFSIZE) runtime_error(\"缓冲区溢出\", {idx}, '{cmd}', '{param}');");
-                        break;
-                    case 'L':
-                    case 'l':
-                        sb.AppendLine($"        x -= val;");
-                        sb.AppendLine($"        if (x < 0) runtime_error(\"缓冲区溢出\", {idx}, '{cmd}', '{param}');");
-                        break;
-                    case 'R':
-                    case 'r':
-                        sb.AppendLine($"        x += val;");
-                        sb.AppendLine($"        if (x >= BUFSIZE) runtime_error(\"缓冲区溢出\", {idx}, '{cmd}', '{param}');");
-                        break;
-                    case '+':
-                        if (_options.Strict) sb.AppendLine($"        if ((int)buf[x][y] + val > 255) runtime_error(\"Char类型溢出\", {idx}, '{cmd}', '{param}');");
-                        sb.AppendLine($"        buf[x][y] += (unsigned char)val;");
-                        break;
-                    case '-':
-                        if (_options.Strict) sb.AppendLine($"        if ((int)buf[x][y] - val < 0) runtime_error(\"Char类型溢出\", {idx}, '{cmd}', '{param}');");
-                        sb.AppendLine($"        buf[x][y] -= (unsigned char)val;");
-                        break;
                     case '*':
                         if (_options.Strict) sb.AppendLine($"        if ((int)buf[x][y] * val > 255) runtime_error(\"Char类型溢出\", {idx}, '{cmd}', '{param}');");
                         sb.AppendLine($"        buf[x][y] *= (unsigned char)val;");
@@ -326,9 +311,8 @@ namespace sprh
             }
             else
             {
-                switch (cmd)
+                switch (lowerCmd)
                 {
-                    case 'P':
                     case 'p':
                         if (_options.Debug) sb.AppendLine($"    std::cerr << \"[Log] 参数:{param}\" << std::endl;");
                         if (_options.Debug) sb.AppendLine($"    std::cerr << \"[Warn] 结果:\" << std::endl;");
@@ -341,41 +325,26 @@ namespace sprh
                         if (_options.Debug) sb.AppendLine($"    std::cout << std::endl;");
                         break;
 
-                    case 'V':
                     case 'v':
                         GenerateVInstruction(sb, param, idx);
                         break;
 
                     case '=':
                         if (_options.Debug) sb.AppendLine($"    std::cerr << \"[Log] 参数:{param}\" << std::endl;");
-                        sb.AppendLine($"    buf[x][y] = (unsigned char)'{param}';");
+                        string escaped = param switch
+                        {
+                            '\'' => "\\'",
+                            '\\' => "\\\\",
+                            _ => param.ToString()
+                        };
+                        sb.AppendLine($"    buf[x][y] = (unsigned char)'{escaped}';");
                         break;
 
                     case '+':
-                        if (param == '+')
-                        {
-                            if (_options.Debug) sb.AppendLine($"    std::cerr << \"[Log] 将当前位置的值设为255\" << std::endl;");
-                            sb.AppendLine($"    buf[x][y] = 255;");
-                        }
-                        else
-                        {
-                            sb.AppendLine($"    runtime_error(\"参数不是十六进制数\", {idx}, '{cmd}', '{param}');");
-                        }
-                        break;
-
                     case '-':
-                        if (param == '-')
-                        {
-                            if (_options.Debug) sb.AppendLine($"    std::cerr << \"[Log] 将当前位置的值归零\" << std::endl;");
-                            sb.AppendLine($"    buf[x][y] = 0;");
-                        }
-                        else
-                        {
-                            sb.AppendLine($"    runtime_error(\"参数不是十六进制数\", {idx}, '{cmd}', '{param}');");
-                        }
+                        GenerateAddSubInstruction(sb, cmd, param, idx);
                         break;
 
-                    case 'I':
                     case 'i':
                         GenerateIInstruction(sb, param, idx);
                         break;
@@ -389,12 +358,10 @@ namespace sprh
                         GenerateBitwiseInstruction(sb, cmd, param, idx);
                         break;
 
-                    case 'S':
                     case 's':
                         GenerateStackInstruction(sb, param, idx);
                         break;
 
-                    case 'F':
                     case 'f':
                         GenerateFileInstruction(sb, param, idx);
                         break;
@@ -404,6 +371,159 @@ namespace sprh
                         break;
                 }
                 return false;
+            }
+        }
+
+        // 移动指令生成（支持 v 和 ?）
+        private bool GenerateMoveInstruction(StringBuilder sb, char cmd, char param, int idx)
+        {
+            string coord = (char.ToLower(cmd) == 'l' || char.ToLower(cmd) == 'r') ? "x" : "y";
+            string sign = (char.ToLower(cmd) == 'u' || char.ToLower(cmd) == 'l') ? "-=" : "+=";
+            string boundCheck, clampValue, direction;
+            if (char.ToLower(cmd) == 'u') { boundCheck = "y < 0"; clampValue = "0"; direction = "上"; }
+            else if (char.ToLower(cmd) == 'd') { boundCheck = "y >= BUFSIZE"; clampValue = "BUFSIZE - 1"; direction = "下"; }
+            else if (char.ToLower(cmd) == 'l') { boundCheck = "x < 0"; clampValue = "0"; direction = "左"; }
+            else { boundCheck = "x >= BUFSIZE"; clampValue = "BUFSIZE - 1"; direction = "右"; }
+
+            sb.AppendLine($"    {{ // 移动指令 {(char.ToUpper(cmd))}{param}");
+
+            if (param == 'v')
+            {
+                if (_options.Debug) sb.AppendLine($"        std::cerr << \"[Log] 变量现在数值&{direction}移动距离:\" << (int)variable << std::endl;");
+                sb.AppendLine($"        {coord} {sign} variable;");
+                sb.AppendLine($"        if ({boundCheck}) {{");
+                if (_options.Strict)
+                    sb.AppendLine($"            runtime_error(\"{direction}移距离超过缓冲区边界\", {idx}, '{cmd}', '{param}');");
+                else
+                {
+                    sb.AppendLine($"            std::cerr << \"[Warn] {direction}移距离超过缓冲区边界,自动移动到缓冲区边界\" << std::endl;");
+                    sb.AppendLine($"            {coord} = {clampValue};");
+                }
+                sb.AppendLine($"        }}");
+            }
+            else if (param == '?')
+            {
+                string maxExpr;
+                if (char.ToLower(cmd) == 'u' || char.ToLower(cmd) == 'l')
+                    maxExpr = coord; // 对于 U/L，当前坐标值
+                else
+                    maxExpr = $"BUFSIZE - 1 - {coord}"; // 对于 D/R，剩余空间
+
+                sb.AppendLine($"        int maxMove = {maxExpr};");
+                sb.AppendLine($"        if (maxMove <= 0) {{");
+                if (_options.Strict)
+                    sb.AppendLine($"            runtime_error(\"{direction}移距离超过缓冲区边界\", {idx}, '{cmd}', '{param}');");
+                else
+                    sb.AppendLine($"            std::cerr << \"[Warn] {direction}移距离超过缓冲区边界,已取消操作\" << std::endl;");
+                sb.AppendLine($"        }} else {{");
+                sb.AppendLine($"            int r = rand() % maxMove + 1; // 随机 1 ~ maxMove");
+                if (_options.Debug) sb.AppendLine($"            std::cerr << \"[Log] 随机到的数值&移动距离:\" << r << std::endl;");
+                sb.AppendLine($"            {coord} {sign} r;");
+                sb.AppendLine($"            if ({boundCheck}) {{");
+                if (_options.Strict)
+                    sb.AppendLine($"                runtime_error(\"{direction}移距离超过缓冲区边界\", {idx}, '{cmd}', '{param}');");
+                else
+                {
+                    sb.AppendLine($"                std::cerr << \"[Warn] {direction}移距离超过缓冲区边界,自动移动到缓冲区边界\" << std::endl;");
+                    sb.AppendLine($"                {coord} = {clampValue};");
+                }
+                sb.AppendLine($"            }}");
+                sb.AppendLine($"        }}");
+            }
+            else if (char.ToLower(param) >= '0' && char.ToLower(param) <= '9' ||
+                     char.ToLower(param) >= 'a' && char.ToLower(param) <= 'f' ||
+                     char.ToLower(param) >= 'A' && char.ToLower(param) <= 'F')
+            {
+                // 十六进制立即数
+                sb.AppendLine($"        int val = hex_char_to_int('{param}');");
+                sb.AppendLine($"        if (val == -1) runtime_error(\"参数不是十六进制数\", {idx}, '{cmd}', '{param}');");
+                if (_options.Debug) sb.AppendLine($"        std::cerr << \"[Log] 参数:\" << '{param}' << std::endl;");
+                sb.AppendLine($"        {coord} {sign} val;");
+                sb.AppendLine($"        if ({boundCheck}) {{");
+                if (_options.Strict)
+                    sb.AppendLine($"            runtime_error(\"{direction}移距离超过缓冲区边界\", {idx}, '{cmd}', '{param}');");
+                else
+                {
+                    sb.AppendLine($"            std::cerr << \"[Warn] {direction}移距离超过缓冲区边界,自动移动到缓冲区边界\" << std::endl;");
+                    sb.AppendLine($"            {coord} = {clampValue};");
+                }
+                sb.AppendLine($"        }}");
+            }
+            else
+            {
+                sb.AppendLine($"        runtime_error(\"参数不是一个十六进制整型或其他可能的参数\", {idx}, '{cmd}', '{param}');");
+            }
+            sb.AppendLine($"    }}");
+            return false;
+        }
+
+        // 算术指令 + 和 - 统一处理
+        private void GenerateAddSubInstruction(StringBuilder sb, char cmd, char param, int idx)
+        {
+            if (param == '+' && cmd == '+')
+            {
+                if (_options.Debug) sb.AppendLine($"    std::cerr << \"[Log] 将当前位置的值设为255\" << std::endl;");
+                sb.AppendLine($"    buf[x][y] = 255;");
+                return;
+            }
+            if (param == '-' && cmd == '-')
+            {
+                if (_options.Debug) sb.AppendLine($"    std::cerr << \"[Log] 将当前位置的值归零\" << std::endl;");
+                sb.AppendLine($"    buf[x][y] = 0;");
+                return;
+            }
+            if (param == '?')
+            {
+                if (cmd == '+')
+                {
+                    sb.AppendLine($"    {{");
+                    sb.AppendLine($"        int maxAdd = 255 - buf[x][y];");
+                    sb.AppendLine($"        if (maxAdd > 1) {{");
+                    sb.AppendLine($"            int r = rand() % maxAdd + 1;");
+                    if (_options.Debug) sb.AppendLine($"            std::cerr << \"[Log] 当前格的值:\" << (int)buf[x][y] << \",随机到的值:\" << r << std::endl;");
+                    sb.AppendLine($"            buf[x][y] += (unsigned char)r;");
+                    sb.AppendLine($"        }} else {{");
+                    if (_options.Debug) sb.AppendLine($"            std::cerr << \"[Warn] 当前单元格值已满，无法随机增加\" << std::endl;");
+                    sb.AppendLine($"        }}");
+                    sb.AppendLine($"    }}");
+                }
+                else // cmd == '-'
+                {
+                    sb.AppendLine($"    {{");
+                    sb.AppendLine($"        int maxRedu = buf[x][y];");
+                    sb.AppendLine($"        if (maxRedu > 1) {{");
+                    sb.AppendLine($"            int r = rand() % maxRedu + 1;");
+                    if (_options.Debug) sb.AppendLine($"            std::cerr << \"[Log] 当前格的值:\" << (int)buf[x][y] << \",随机到的值:\" << r << std::endl;");
+                    sb.AppendLine($"            buf[x][y] -= (unsigned char)r;");
+                    sb.AppendLine($"        }} else {{");
+                    if (_options.Debug) sb.AppendLine($"            std::cerr << \"[Warn] 当前单元格值已空，无法随机减少\" << std::endl;");
+                    sb.AppendLine($"        }}");
+                    sb.AppendLine($"    }}");
+                }
+                return;
+            }
+            // 否则当作十六进制立即数
+            if ("0123456789abcdefABCDEF".Contains(param))
+            {
+                sb.AppendLine($"    {{");
+                sb.AppendLine($"        int val = hex_char_to_int('{param}');");
+                sb.AppendLine($"        if (val == -1) runtime_error(\"参数不是十六进制数\", {idx}, '{cmd}', '{param}');");
+                if (_options.Debug) sb.AppendLine($"        std::cerr << \"[Log] 参数:\" << '{param}' << std::endl;");
+                if (cmd == '+')
+                {
+                    if (_options.Strict) sb.AppendLine($"        if ((int)buf[x][y] + val > 255) runtime_error(\"Char类型溢出\", {idx}, '{cmd}', '{param}');");
+                    sb.AppendLine($"        buf[x][y] += (unsigned char)val;");
+                }
+                else
+                {
+                    if (_options.Strict) sb.AppendLine($"        if ((int)buf[x][y] - val < 0) runtime_error(\"Char类型溢出\", {idx}, '{cmd}', '{param}');");
+                    sb.AppendLine($"        buf[x][y] -= (unsigned char)val;");
+                }
+                sb.AppendLine($"    }}");
+            }
+            else
+            {
+                sb.AppendLine($"    runtime_error(\"参数不是一个十六进制整型或其他可能的参数\", {idx}, '{cmd}', '{param}');");
             }
         }
 
@@ -476,6 +596,12 @@ namespace sprh
                 sb.AppendLine($"    variable /= buf[x][y];");
                 if (_options.Debug) sb.AppendLine($"    std::cerr << \"[Log] 变量现数值:\" << (int)variable << std::endl;");
             }
+            else if (param == '?')
+            {
+                if (_options.Debug) sb.AppendLine($"    std::cerr << \"[Log] 变量原数值:\" << (int)variable << std::endl;");
+                sb.AppendLine($"    variable = (unsigned char)(rand() % 256);");
+                if (_options.Debug) sb.AppendLine($"    std::cerr << \"[Log] 变量现数值:\" << (int)variable << std::endl;");
+            }
             else
             {
                 sb.AppendLine($"    runtime_error(\"未知的V参数\", {idx}, 'V', '{param}');");
@@ -485,7 +611,7 @@ namespace sprh
         private void GenerateIInstruction(StringBuilder sb, char param, int idx)
         {
             if (_options.Debug) sb.AppendLine($"    std::cerr << \"[Warn] 请输入:\" << std::endl;");
-            sb.AppendLine($"    int ch = GETCH();");
+            sb.AppendLine($"    ch = GETCH();");
             if (param == '+')
             {
                 if (_options.Strict) sb.AppendLine($"    if ((int)buf[x][y] + ch > 255) runtime_error(\"Char类型溢出\", {idx}, 'I', '{param}');");
@@ -688,7 +814,8 @@ namespace sprh
         private bool IsHexInstruction(char cmd)
         {
             char lower = char.ToLower(cmd);
-            return "udlr*/<>".Contains(lower) || cmd == '+' || cmd == '-';
+            // 只保留 * / < >，移除了 u d l r + -
+            return "*/<>".Contains(lower);
         }
     }
 }

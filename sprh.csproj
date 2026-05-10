@@ -14,7 +14,7 @@
     <Authors>LargeHard Inc.</Authors>
     <Product>SPRH Interpreter</Product>
     <PublishAot>True</PublishAot>
-    <PublishTrimmed>True</PublishTrimmed>
+    <PublishTrimmed>False</PublishTrimmed>
     <PackageId>LargeHard_SPRH_Interpreter</PackageId>
     <Title>LargeHard SPRH Interpreter</Title>
     <AssemblyTitle>LargeHard SPRH Interpreter</AssemblyTitle>
