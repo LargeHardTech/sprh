@@ -27,8 +27,39 @@ namespace sprh
         private static int y = 0;
         private static Stack<byte> stack = new Stack<byte>();
         internal static FileStream? inputFileStream = null;
+
+        /// <summary>
+        /// 安全关闭并释放输入文件流
+        /// </summary>
+        internal static void DisposeInputStream()
+        {
+            if (inputFileStream != null)
+            {
+                inputFileStream.Close();
+                inputFileStream.Dispose();
+                inputFileStream = null;
+            }
+        }
+
         private static ConsoleAddon ca = new ConsoleAddon();
-        private static Random rand = new Random();
+        private static Random rand = Random.Shared;
+
+        // 预编译正则，避免每次循环重复解析
+        private static readonly Regex HexDigitRegex = new Regex(
+            "^[0-9A-Fa-f]+$", RegexOptions.Compiled);
+
+        // 辅助方法：判断字符是否为十六进制数字
+        private static bool IsHexDigit(char c)
+            => (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f');
+
+        // 辅助方法：将十六进制字符转为整数值
+        private static int HexCharToInt(char c) => c switch
+        {
+            >= '0' and <= '9' => c - '0',
+            >= 'A' and <= 'F' => c - 'A' + 10,
+            >= 'a' and <= 'f' => c - 'a' + 10,
+            _ => throw new ArgumentException($"非十六进制字符: {c}")
+        };
         public void error(string a, int idx)
         {
             if (debug)
@@ -39,7 +70,7 @@ namespace sprh
             ca.Error(a);
             ca.Warn("停止执行" + filename);
             Console.ResetColor();
-            Environment.Exit(0);
+            throw new SprhRuntimeException(a, idx);
         }
         private void ShowLogo()
         {
@@ -93,12 +124,12 @@ namespace sprh
             {
                 if (debug) { ca.log("执行代码:" + op[i] + op[i + 1]); Thread.Sleep(sleeptime); }
                 //==========================================================
-                if (op[i].ToString().ToLower() == "u")
+                if (char.ToLower(op[i]) == 'u')
                 {
-                    if (Regex.IsMatch(op[i + 1].ToString(), "^[0-9A-Fa-f]+$"))
+                    if (IsHexDigit(op[i + 1]))
                     {
                         if (debug) ca.log("参数:" + op[i + 1]);
-                        y -= Convert.ToInt32(op[i + 1].ToString(), 16);
+                        y -= HexCharToInt(op[i + 1]);
                         if (y < 0)
                         {
                             if (strict)
@@ -139,12 +170,12 @@ namespace sprh
                     }
                     else error("在执行\"" + op[i] + op[i + 1] + "\"时出错,原因:参数" + op[i + 1] + "不是一个十六进制整型或其他可能的参数", i);
                 }
-                else if (op[i].ToString().ToLower() == "d")
+                else if (char.ToLower(op[i]) == 'd')
                 {
-                    if (Regex.IsMatch(op[i + 1].ToString(), "^[0-9A-Fa-f]+$"))
+                    if (IsHexDigit(op[i + 1]))
                     {
                         if (debug) ca.log("参数:" + op[i + 1]);
-                        y += Convert.ToInt32(op[i + 1].ToString(), 16);
+                        y += HexCharToInt(op[i + 1]);
                         if (y >= bufsize)
                         {
                             if (strict)
@@ -186,12 +217,12 @@ namespace sprh
                     }
                     else error("在执行\"" + op[i] + op[i + 1] + "\"时出错,原因:参数" + op[i + 1] + "不是一个十六进制整型或其他可能的参数", i);
                 }
-                else if (op[i].ToString().ToLower() == "l")
+                else if (char.ToLower(op[i]) == 'l')
                 {
-                    if (Regex.IsMatch(op[i + 1].ToString(), "^[0-9A-Fa-f]+$"))
+                    if (IsHexDigit(op[i + 1]))
                     {
                         if (debug) ca.log("参数:" + op[i + 1]);
-                        x -= Convert.ToInt32(op[i + 1].ToString(), 16);
+                        x -= HexCharToInt(op[i + 1]);
                         if (x < 0)
                         {
                             if (strict)
@@ -232,12 +263,12 @@ namespace sprh
                     }
                     else error("在执行\"" + op[i] + op[i + 1] + "\"时出错,原因:参数" + op[i + 1] + "不是一个十六进制整型或其他可能的参数", i);
                 }
-                else if (op[i].ToString().ToLower() == "r")
+                else if (char.ToLower(op[i]) == 'r')
                 {
-                    if (Regex.IsMatch(op[i + 1].ToString(), "^[0-9A-Fa-f]+$"))
+                    if (IsHexDigit(op[i + 1]))
                     {
                         if (debug) ca.log("参数:" + op[i + 1]);
-                        x += Convert.ToInt32(op[i + 1].ToString(), 16);
+                        x += HexCharToInt(op[i + 1]);
                         if (x >= bufsize)
                         {
                             if (strict)
@@ -281,9 +312,9 @@ namespace sprh
                 }
                 else if (op[i] == '+')
                 {
-                    if (Regex.IsMatch(op[i + 1].ToString(), "^[0-9A-Fa-f]+$"))
+                    if (IsHexDigit(op[i + 1]))
                     {
-                        byte a = (byte)Convert.ToInt32(op[i + 1].ToString(), 16);
+                        byte a = (byte)HexCharToInt(op[i + 1]);
                         if (debug)
                         {
                             ca.log("参数:" + op[i + 1]);
@@ -292,7 +323,7 @@ namespace sprh
                         {
                             error("在执行\"" + op[i] + op[i + 1] + "\"时出错,原因:Char类型溢出", i);
                         }
-                        buf[x, y] += (byte)Convert.ToInt32(op[i + 1].ToString(), 16);
+                        buf[x, y] += (byte)HexCharToInt(op[i + 1]);
                     }
                     else
                     {
@@ -330,9 +361,9 @@ namespace sprh
                 }
                 else if (op[i] == '-')
                 {
-                    if (Regex.IsMatch(op[i + 1].ToString(), "^[0-9A-Fa-f]+$"))
+                    if (IsHexDigit(op[i + 1]))
                     {
-                        byte a = (byte)Convert.ToInt32(op[i + 1].ToString(), 16);
+                        byte a = (byte)HexCharToInt(op[i + 1]);
                         if (debug)
                         {
                             ca.log("参数:" + op[i + 1]);
@@ -341,7 +372,7 @@ namespace sprh
                         {
                             error("在执行\"" + op[i] + op[i + 1] + "\"时出错,原因:Char类型溢出", i);
                         }
-                        buf[x, y] -= (byte)Convert.ToInt32(op[i + 1].ToString(), 16);
+                        buf[x, y] -= (byte)HexCharToInt(op[i + 1]);
                     }
                     else
                     {
@@ -356,7 +387,7 @@ namespace sprh
                         else if (op[i + 1] == '?')
                         {
                             int maxRedu = buf[x, y];
-                            if (maxRedu > 1)
+                            if (maxRedu >= 1)
                             {
                                 int r = rand.Next(1, maxRedu + 1);
                                 if (debug) ca.log("当前格的值:" + buf[x, y]);
@@ -520,9 +551,9 @@ namespace sprh
                 }
                 else if (op[i] == '*')
                 {
-                    if (Regex.IsMatch(op[i + 1].ToString(), "^[0-9A-Fa-f]+$"))
+                    if (IsHexDigit(op[i + 1]))
                     {
-                        byte a = (byte)Convert.ToInt32(op[i + 1].ToString(), 16);
+                        byte a = (byte)HexCharToInt(op[i + 1]);
                         if (debug)
                         {
                             ca.log("参数:" + op[i + 1]);
@@ -531,7 +562,7 @@ namespace sprh
                         {
                             error("在执行\"" + op[i] + op[i + 1] + "\"时出错,原因:Char类型溢出", i);
                         }
-                        buf[x, y] *= (byte)Convert.ToInt32(op[i + 1].ToString(), 16);
+                        buf[x, y] *= (byte)HexCharToInt(op[i + 1]);
                     }
                     else
                     {
@@ -542,9 +573,9 @@ namespace sprh
                 }
                 else if (op[i] == '/')
                 {
-                    if (Regex.IsMatch(op[i + 1].ToString(), "^[0-9A-Fa-f]+$"))
+                    if (IsHexDigit(op[i + 1]))
                     {
-                        byte a = (byte)Convert.ToInt32(op[i + 1].ToString(), 16);
+                        byte a = (byte)HexCharToInt(op[i + 1]);
                         if (debug)
                         {
                             ca.log("参数:" + op[i + 1]);
@@ -553,7 +584,7 @@ namespace sprh
                         {
                             error("在执行\"" + op[i] + op[i + 1] + "\"时出错,原因:0不能作为除数", i);
                         }
-                        buf[x, y] /= (byte)Convert.ToInt32(op[i + 1].ToString(), 16);
+                        buf[x, y] /= (byte)HexCharToInt(op[i + 1]);
                     }
                     else
                     {
@@ -577,91 +608,94 @@ namespace sprh
                 {
                     char param = char.ToLower(op[i + 1]);
                     int targetX = x, targetY = y;
-                    bool cond = false;
                     switch (param)
                     {
-                        case 'u': targetY = y - 1; cond = buf[x, y] == buf[x, y - 1]; break;
-                        case 'd': targetY = y + 1; cond = buf[x, y] == buf[x, y + 1]; break;
-                        case 'l': targetX = x - 1; cond = buf[x, y] == buf[x - 1, y]; break;
-                        case 'r': targetX = x + 1; cond = buf[x, y] == buf[x + 1, y]; break;
+                        case 'u': targetY = y - 1; break;
+                        case 'd': targetY = y + 1; break;
+                        case 'l': targetX = x - 1; break;
+                        case 'r': targetX = x + 1; break;
                         default:
                             error("在执行\"" + op[i] + op[i + 1] + "\"时出错,原因:未知的参数\"" + op[i + 1] + '\"', i);
                             break;
                     }
+                    // 先检查边界，再访问数组，避免 IndexOutOfRangeException
                     if (targetX < 0 || targetX >= bufsize || targetY < 0 || targetY >= bufsize)
                     {
                         error("在执行\"" + op[i] + op[i + 1] + "\"时出错,原因:缓冲区溢出", i);
                     }
+                    bool cond = buf[x, y] == buf[targetX, targetY];
                     if (debug)
                     {
                         ca.log("当前位置数值:" + buf[x, y] + ",目标数值:" + buf[targetX, targetY]);
                     }
                     if (cond)
                     {
-                        i = search(i, ']');
+                        i = search(i,'[', ']');
                     }
                 }
                 else if (op[i] == '{')
                 {
                     char param = char.ToLower(op[i + 1]);
                     int targetX = x, targetY = y;
-                    bool cond = false;
                     switch (param)
                     {
-                        case 'u': targetY = y - 1; cond = buf[x, y] > buf[x, y - 1]; break;
-                        case 'd': targetY = y + 1; cond = buf[x, y] > buf[x, y + 1]; break;
-                        case 'l': targetX = x - 1; cond = buf[x, y] > buf[x - 1, y]; break;
-                        case 'r': targetX = x + 1; cond = buf[x, y] > buf[x + 1, y]; break;
+                        case 'u': targetY = y - 1; break;
+                        case 'd': targetY = y + 1; break;
+                        case 'l': targetX = x - 1; break;
+                        case 'r': targetX = x + 1; break;
                         default:
                             error("在执行\"" + op[i] + op[i + 1] + "\"时出错,原因:未知的参数\"" + op[i + 1] + '\"', i);
                             break;
                     }
+                    // 先检查边界，再访问数组
                     if (targetX < 0 || targetX >= bufsize || targetY < 0 || targetY >= bufsize)
                     {
                         error("在执行\"" + op[i] + op[i + 1] + "\"时出错,原因:缓冲区溢出", i);
                     }
+                    bool cond = buf[x, y] > buf[targetX, targetY];
                     if (debug)
                     {
                         ca.log("当前位置数值:" + buf[x, y] + ",目标数值:" + buf[targetX, targetY]);
                     }
                     if (cond)
                     {
-                        i = search(i, '}');
+                        i = search(i,'{', '}');
                     }
                 }
                 else if (op[i] == '(')
                 {
                     char param = char.ToLower(op[i + 1]);
                     int targetX = x, targetY = y;
-                    bool cond = false;
                     switch (param)
                     {
-                        case 'u': targetY = y - 1; cond = buf[x, y] < buf[x, y - 1]; break;
-                        case 'd': targetY = y + 1; cond = buf[x, y] < buf[x, y + 1]; break;
-                        case 'l': targetX = x - 1; cond = buf[x, y] < buf[x - 1, y]; break;
-                        case 'r': targetX = x + 1; cond = buf[x, y] < buf[x + 1, y]; break;
+                        case 'u': targetY = y - 1; break;
+                        case 'd': targetY = y + 1; break;
+                        case 'l': targetX = x - 1; break;
+                        case 'r': targetX = x + 1; break;
                         default:
                             error("在执行\"" + op[i] + op[i + 1] + "\"时出错,原因:未知的参数\"" + op[i + 1] + '\"', i);
                             break;
                     }
+                    // 先检查边界，再访问数组
                     if (targetX < 0 || targetX >= bufsize || targetY < 0 || targetY >= bufsize)
                     {
                         error("在执行\"" + op[i] + op[i + 1] + "\"时出错,原因:缓冲区溢出", i);
                     }
+                    bool cond = buf[x, y] < buf[targetX, targetY];
                     if (debug)
                     {
                         ca.log("当前位置数值:" + buf[x, y] + ",目标数值:" + buf[targetX, targetY]);
                     }
                     if (cond)
                     {
-                        i = search(i, ')');
+                        i = search(i,'(', ')');
                     }
                 }
                 else if (op[i] == '<')
                 {
-                    if (Regex.IsMatch(op[i + 1].ToString(), "^[0-9A-Fa-f]+$"))
+                    if (IsHexDigit(op[i + 1]))
                     {
-                        byte a = (byte)Convert.ToInt32(op[i + 1].ToString(), 16);
+                        byte a = (byte)HexCharToInt(op[i + 1]);
                         if (debug)
                         {
                             ca.log("参数:" + op[i + 1]);
@@ -681,9 +715,9 @@ namespace sprh
                 }
                 else if (op[i] == '>')
                 {
-                    if (Regex.IsMatch(op[i + 1].ToString(), "^[0-9A-Fa-f]+$"))
+                    if (IsHexDigit(op[i + 1]))
                     {
-                        byte a = (byte)Convert.ToInt32(op[i + 1].ToString(), 16);
+                        byte a = (byte)HexCharToInt(op[i + 1]);
                         if (debug)
                         {
                             ca.log("参数:" + op[i + 1]);
@@ -692,7 +726,7 @@ namespace sprh
                         {
                             error("在执行\"" + op[i] + op[i + 1] + "\"时出错,原因:跳转时计数器溢出", i);
                         }
-                        i += a * 2;
+                        i += a * 2 - 2;  // -2 抵消循环的 i+=2，使跳转与 < 指令对称
                     }
                     else
                     {
@@ -884,16 +918,60 @@ namespace sprh
                         ca.log("参数:" + subCmd);
                         ca.Warn("执行文件操作...");
                     }
-                    if (subCmd == '+' || subCmd == '-' || subCmd == '*' || subCmd == '/' || subCmd == '=')
+                    if(subCmd == '<')
+                    {
+                        inputfilename += buf[x, y];
+                        if (debug)
+                        {
+                            ca.log("将" + buf[x,y]+"添加到输入文件名");
+                            ca.Warn("当前输入文件名:"+inputfilename);
+                        }
+                    }
+                    else if(subCmd == '>')
+                    {
+                        outputfilename += buf[x, y];
+                        if (debug)
+                        {
+                            ca.log("将" + buf[x, y] + "添加到输出文件名");
+                            ca.Warn("当前输出文件名:" + outputfilename);
+                        }
+                    }
+                    else if(subCmd == '[')
+                    {
+                        inputfilename = "";
+                        if (debug)
+                        {
+                            ca.log("将输入文件名清除");
+                        }
+                    }
+                    else if(subCmd == ']')
+                    {
+                        outputfilename = "";
+                        if (debug)
+                        {
+                            ca.log("将输出文件名清除");
+                        }
+                    }
+                    else if(subCmd == '+' || subCmd == '-' || subCmd == '*' || subCmd == '/' || subCmd == '=')
                     {
                         if (string.IsNullOrEmpty(inputfilename))
                         {
                             error("在执行\"" + op[i] + op[i + 1] + "\"时出错,原因:未指定输入文件名", i);
                         }
+                        if (!File.Exists(inputfilename))
+                        {
+                            error("在执行\"" + op[i] + op[i + 1] + "\"时出错,原因:文件不存在", i);
+                        }
                         try
                         {
                             if (inputFileStream == null)
                             {
+                                inputFileStream = new FileStream(inputfilename, FileMode.Open, FileAccess.Read);
+                            }
+                            if (Path.GetFullPath(inputFileStream.Name) != Path.GetFullPath(inputfilename))
+                            {
+                                inputFileStream.Close();
+                                inputFileStream.Dispose();
                                 inputFileStream = new FileStream(inputfilename, FileMode.Open, FileAccess.Read);
                             }
                             int b = inputFileStream.ReadByte();
@@ -935,6 +1013,7 @@ namespace sprh
                             if (debug)
                             {
                                 ca.log("操作后当前单元格值:" + buf[x, y]);
+                                ca.log("当前文件流位置:"+inputFileStream.Position.ToString());
                             }
                         }
                         catch (Exception ex)
@@ -942,13 +1021,16 @@ namespace sprh
                             error("在执行\"" + op[i] + op[i + 1] + "\"时出错,原因:文件操作异常 - " + ex.Message, i);
                         }
                     }
-                    // 文件输出：c（字符）或 i（整数）
                     else if (subCmd == 'c' || subCmd == 'C' || subCmd == 'i' || subCmd == 'I')
                     {
                         if (string.IsNullOrEmpty(outputfilename))
                         {
                             error("在执行\"" + op[i] + op[i + 1] + "\"时出错,原因:未指定输出文件名", i);
                         }
+                        //if (!File.Exists(outputfilename))
+                        //{
+                        //   error("在执行\"" + op[i] + op[i + 1] + "\"时出错,原因:文件不存在", i);
+                        //}
                         try
                         {
                             using (StreamWriter sw = new StreamWriter(outputfilename, true, Encoding.Default))
@@ -992,42 +1074,39 @@ namespace sprh
             }
 
         }
-        private int search(int i, char c)
+        
+        private int search(int i, char o, char c)
         {
-            int q = 0;
-            int q1 = 0;
-            for (int j = i; j < op.Length - 1; j += 1)
+            // depth: 当前嵌套深度（已遇到一个开括号，初始为1）
+            int depth = 1;
+            // 从开括号的下一条指令开始搜索（i是开括号指令的字符索引，每条指令2字符）
+            for (int j = i + 2; j < op.Length - 1; j += 2)
             {
-                if (op[j] == '/' && op[j + 1] == c)
+                // 遇到同类型的开括号（命令符匹配且参数为方向字符），嵌套深度+1
+                if (op[j] == o && (op[j + 1] == 'u' || op[j + 1] == 'd' ||
+                                   op[j + 1] == 'l' || op[j + 1] == 'r'))
                 {
+                    depth++;
+                }
+                // 遇到对应的闭括号，嵌套深度-1
+                else if (op[j] == '/' && op[j + 1] == c)
+                {
+                    depth--;
                     if (debug)
                     {
-                        if ((((i + j) / 2) + 2) < op.Length)
-                        {
-                            ca.log("索引到" +
-                            (int)(((i + j) / 2) + 2) + ":" + op[(((i + j) / 2) + 2)] + op[(((i + j) / 2) + 3)] +
-                            ",目前读取到的嵌套层数:" + q1.ToString() + "/" + q.ToString());
-                        }
+                        int targetInstr = j / 2;
+                        if (targetInstr * 2 + 2 < op.Length)
+                            ca.log("索引到指令" + targetInstr + ":/" + c +
+                                   ",目前嵌套层数:" + depth);
                         else
-                        {
-                            ca.log("索引到代码末尾");
-                        }
-
-                        //ca.log("索引到" + (j + 2) + ":" + op[(j + 2)] + op[(j + 2)]);
+                            ca.log("索引到代码末尾,嵌套层数:" + depth);
                     }
-                    if (q - q1 == 0)
+                    if (depth == 0)
                     {
-                        return (((i + j) / 2) + 2);
+                        // 返回闭括号指令的字符索引
+                        // 循环中的 i+=2 会使下次迭代从此指令的下一条指令开始
+                        return j;
                     }
-                    else
-                    {
-                        q1++;
-                    }
-                    //i = j + 2;
-                }
-                else if (op[j] == c && (op[j + 1] == 'l' || op[j + 1] == 'r' || op[j + 1] == 'u' || op[j + 1] == 'd'))
-                {
-                    q++;
                 }
             }
             error("未能索引到后面的/" + c, i);

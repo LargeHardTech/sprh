@@ -9,8 +9,8 @@ namespace sprh
         public static string version = "2.1";
         private static string filename = "";
         private static string filenametoconvert = "";
-        private static string inputfilename = "";
-        private static string outputfilename = "";
+        //private static string inputfilename = "";
+        //private static string outputfilename = "";
         private static bool debug = false;
         private static bool timer = false;
         private static bool strict = false;
@@ -75,7 +75,7 @@ namespace sprh
                         argsError = true;
                     }
                 }
-                else if (args[i].ToLower().EndsWith(".spri"))
+                /*else if (args[i].ToLower().EndsWith(".spri"))
                 {
                     if (!inputfilenameflag)
                     {
@@ -87,8 +87,8 @@ namespace sprh
                         ca.Error("提供了多个需要读取的文件名,sprh解释器无法确定准确位置");
                         argsError = true;
                     }
-                }
-                else if (args[i].ToLower().EndsWith(".spro"))
+                }*/
+                /*else if (args[i].ToLower().EndsWith(".spro"))
                 {
                     if (!outputfilenameflag)
                     {
@@ -100,7 +100,7 @@ namespace sprh
                         ca.Error("提供了多个需要写入的文件名,sprh解释器无法确定准确位置");
                         argsError = true;
                     }
-                }
+                }*/
                 else if (args[i].ToLower() == "-debug" || args[i].ToLower() == "-d")
                 {
                     debug = true;
@@ -148,7 +148,7 @@ namespace sprh
             {
                 ca.Warn("提供了转换后.cpp的位置,但没有要求转换为.cpp");
             }
-            bool i1=false,o1 = false;
+            /*bool i1=false,o1 = false;
             if (!inputfilenameflag)
             {
                 
@@ -164,7 +164,7 @@ namespace sprh
                     outputfilename = GetDirectoryPath(filename) + "output.spro";
                 }
                 o1 = true;
-            }
+            }*/
             /*try
             {
                 inputFileStream = new FileStream(inputfilename, FileMode.Open, FileAccess.Read);
@@ -188,7 +188,7 @@ namespace sprh
                 System.Threading.Thread.Sleep(sleeptime);
                 ca.log("开始检查文件");
                 System.Threading.Thread.Sleep(sleeptime);
-                if (i1)
+                /*if (i1)
                 {
                     ca.log("自动补全输入文件到:" + inputfilename);
                     System.Threading.Thread.Sleep(sleeptime);
@@ -197,7 +197,7 @@ namespace sprh
                 {
                     ca.log("自动补全输出文件到:" + inputfilename);
                     System.Threading.Thread.Sleep(sleeptime);
-                }
+                }*/
 
             }
             if (!File.Exists(filename))
@@ -271,10 +271,17 @@ namespace sprh
                     sleeptime = sleeptime,
                     strict = strict,
                     filename = filename,
-                    inputfilename = inputfilename,
-                    outputfilename = outputfilename,
+                    //inputfilename = inputfilename,
+                    //outputfilename = outputfilename,
                 };
-                i.r();
+                try
+                {
+                    i.r();
+                }
+                catch (SprhRuntimeException)
+                {
+                    // 错误信息已在 error() 中输出，此处仅做清理
+                }
             }
             if (timer)
             {
@@ -283,8 +290,7 @@ namespace sprh
                 ca.Warn("停止计时!");
                 ca.Warn("时间(毫秒):"+(double)((end - start).TotalMilliseconds));//','+(double)start.Millisecond+','+end.Millisecond
             }
-            if (Interpreter.inputFileStream != null)
-                Interpreter.inputFileStream.Close();
+            Interpreter.DisposeInputStream();
             return ;
         }
         private static void c()
@@ -295,8 +301,8 @@ namespace sprh
                 Strict = strict,   // 启用严格模式（检查溢出）
                 Debug = debug,
                 SleepTimeMs = sleeptime,
-                InputFile = inputfilename,
-                OutputFile = outputfilename,
+                //InputFile = inputfilename,
+                //OutputFile = outputfilename,
                 BufferSize = Interpreter.bufsize
                 // 不生成调试输出（设为 true 则开启）
             };
@@ -324,8 +330,7 @@ namespace sprh
         }
         private static void exit(object? sender, ConsoleCancelEventArgs e)
         {
-            if (Interpreter.inputFileStream != null)
-                Interpreter.inputFileStream.Close();    
+            Interpreter.DisposeInputStream();
             ca.Warn("已手动停止执行程序"+filename);
             Console.ResetColor();
             Environment.Exit(0);

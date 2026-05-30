@@ -1,4 +1,4 @@
-﻿using System;
+﻿        using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -9,13 +9,12 @@ namespace sprh
 {
     public class SprhToCppCompiler
     {
-
         public class Options
         {
             public bool Strict { get; set; } = false;
             public bool Debug { get; set; } = false;
             public int SleepTimeMs { get; set; } = 0;
-            public int BufferSize { get; set; } = 512;
+            public int BufferSize { get; set; } = 1024;  // 与解释器保持一致
             public string InputFile { get; set; } = "input.spri";
             public string OutputFile { get; set; } = "output.spro";
         }
@@ -42,7 +41,7 @@ namespace sprh
             var instructions = ParseInstructions(noComments);
             Log($"解析到 {instructions.Count} 条指令。");
 
-            Log("正在计算跳转配对（简单匹配，忽略嵌套）...");
+            Log("正在计算跳转配对（支持嵌套）...");
             var jumpPairs = PrecomputeJumpPairs(instructions);
             Log("跳转配对完成。");
 
@@ -80,7 +79,6 @@ namespace sprh
             return list;
         }
 
-
         private Dictionary<int, int> PrecomputeJumpPairs(List<(char Cmd, char Param)> instructions)
         {
             var pairs = new Dictionary<int, int>();
@@ -93,17 +91,29 @@ namespace sprh
                 else if (cmd == '(') closeChar = ')';
                 else continue;
 
-
+                int depth = 1;
+                bool found = false;
                 for (int j = i + 1; j < instructions.Count; j++)
                 {
                     var (jCmd, jParam) = instructions[j];
-                    if (jCmd == '/' && jParam == closeChar)
+                    // 遇到同类型的开括号，嵌套深度+1
+                    if (jCmd == cmd && (jParam == 'u' || jParam == 'd' || jParam == 'l' || jParam == 'r'))
                     {
-                        pairs[i] = j;
-                        break;
+                        depth++;
+                    }
+                    // 遇到对应的闭括号，嵌套深度-1
+                    else if (jCmd == '/' && jParam == closeChar)
+                    {
+                        depth--;
+                        if (depth == 0)
+                        {
+                            pairs[i] = j;
+                            found = true;
+                            break;
+                        }
                     }
                 }
-                if (!pairs.ContainsKey(i))
+                if (!found)
                     throw new InvalidDataException($"未找到匹配的 /{closeChar} 对应指令 {i}");
             }
             return pairs;
@@ -118,6 +128,7 @@ namespace sprh
             sb.AppendLine("#include <iostream>");
             sb.AppendLine("#include <fstream>");
             sb.AppendLine("#include <stack>");
+            sb.AppendLine("#include <string>");
             sb.AppendLine("#include <cstdlib>");
             sb.AppendLine("#include <cstring>");
             sb.AppendLine("#include <cstdio>");
@@ -150,8 +161,10 @@ namespace sprh
             sb.AppendLine($"const char* source_filename = \"{_sourceFileName}\";");
             string escapedInput = _options.InputFile.Replace("\\", "\\\\");
             string escapedOutput = _options.OutputFile.Replace("\\", "\\\\");
-            sb.AppendLine($"const char* input_filename = \"{escapedInput}\";");
-            sb.AppendLine($"const char* output_filename  = \"{escapedOutput}\";");
+            sb.AppendLine($"std::string input_filename = \"{escapedInput}\";");
+            sb.AppendLine($"std::string output_filename = \"{escapedOutput}\";");
+            sb.AppendLine("std::string current_input_filename; // 记录当前打开的文件名");
+            sb.AppendLine();
 
             sb.AppendLine("void runtime_error(const char* reason, int ip, char cmd, char param) {");
             sb.AppendLine("    std::cerr << \"[Warn] 程序发生异常!\" << std::endl;");
@@ -230,7 +243,6 @@ namespace sprh
 
         private bool GenerateInstructionCode(StringBuilder sb, char cmd, char param, int idx, string[] labels, Dictionary<int, int> jumpPairs)
         {
-
             if (cmd == '[' || cmd == '{' || cmd == '(')
             {
                 char dir = char.ToLower(param);
@@ -273,7 +285,6 @@ namespace sprh
                 return true;
             }
 
-            // 移动指令 U/D/L/R 现在可以接受十六进制、v、?
             char lowerCmd = char.ToLower(cmd);
             if (lowerCmd == 'u' || lowerCmd == 'd' || lowerCmd == 'l' || lowerCmd == 'r')
             {
@@ -320,6 +331,8 @@ namespace sprh
                             sb.AppendLine($"    std::cout.put(buf[x][y]);");
                         else if (param == 'i' || param == 'I')
                             sb.AppendLine($"    std::cout << (int)buf[x][y];");
+                        else if (char.ToLower(param) == 'l')
+                            sb.AppendLine($"    // 编译版本不支持显示 Logo，已忽略"); // 与解释器行为兼容，不报错
                         else
                             sb.AppendLine($"    runtime_error(\"未知的参数\", {idx}, '{cmd}', '{param}');");
                         if (_options.Debug) sb.AppendLine($"    std::cout << std::endl;");
@@ -374,7 +387,6 @@ namespace sprh
             }
         }
 
-        // 移动指令生成（支持 v 和 ?）
         private bool GenerateMoveInstruction(StringBuilder sb, char cmd, char param, int idx)
         {
             string coord = (char.ToLower(cmd) == 'l' || char.ToLower(cmd) == 'r') ? "x" : "y";
@@ -405,9 +417,9 @@ namespace sprh
             {
                 string maxExpr;
                 if (char.ToLower(cmd) == 'u' || char.ToLower(cmd) == 'l')
-                    maxExpr = coord; // 对于 U/L，当前坐标值
+                    maxExpr = coord;
                 else
-                    maxExpr = $"BUFSIZE - 1 - {coord}"; // 对于 D/R，剩余空间
+                    maxExpr = $"BUFSIZE - 1 - {coord}";
 
                 sb.AppendLine($"        int maxMove = {maxExpr};");
                 sb.AppendLine($"        if (maxMove <= 0) {{");
@@ -434,7 +446,6 @@ namespace sprh
                      char.ToLower(param) >= 'a' && char.ToLower(param) <= 'f' ||
                      char.ToLower(param) >= 'A' && char.ToLower(param) <= 'F')
             {
-                // 十六进制立即数
                 sb.AppendLine($"        int val = hex_char_to_int('{param}');");
                 sb.AppendLine($"        if (val == -1) runtime_error(\"参数不是十六进制数\", {idx}, '{cmd}', '{param}');");
                 if (_options.Debug) sb.AppendLine($"        std::cerr << \"[Log] 参数:\" << '{param}' << std::endl;");
@@ -457,7 +468,6 @@ namespace sprh
             return false;
         }
 
-        // 算术指令 + 和 - 统一处理
         private void GenerateAddSubInstruction(StringBuilder sb, char cmd, char param, int idx)
         {
             if (param == '+' && cmd == '+')
@@ -479,11 +489,11 @@ namespace sprh
                     sb.AppendLine($"    {{");
                     sb.AppendLine($"        int maxAdd = 255 - buf[x][y];");
                     sb.AppendLine($"        if (maxAdd > 1) {{");
-                    sb.AppendLine($"            int r = rand() % maxAdd + 1;");
+                    sb.AppendLine($"            int r = rand() % (maxAdd - 1) + 1; // 保证增加后不超过254");
                     if (_options.Debug) sb.AppendLine($"            std::cerr << \"[Log] 当前格的值:\" << (int)buf[x][y] << \",随机到的值:\" << r << std::endl;");
                     sb.AppendLine($"            buf[x][y] += (unsigned char)r;");
                     sb.AppendLine($"        }} else {{");
-                    if (_options.Debug) sb.AppendLine($"            std::cerr << \"[Warn] 当前单元格值已满，无法随机增加\" << std::endl;");
+                    if (_options.Debug) sb.AppendLine($"            std::cerr << \"[Warn] 当前单元格值已满或仅差1，无法随机增加\" << std::endl;");
                     sb.AppendLine($"        }}");
                     sb.AppendLine($"    }}");
                 }
@@ -491,8 +501,8 @@ namespace sprh
                 {
                     sb.AppendLine($"    {{");
                     sb.AppendLine($"        int maxRedu = buf[x][y];");
-                    sb.AppendLine($"        if (maxRedu > 1) {{");
-                    sb.AppendLine($"            int r = rand() % maxRedu + 1;");
+                    sb.AppendLine($"        if (maxRedu >= 1) {{");
+                    sb.AppendLine($"            int r = rand() % maxRedu + 1; // 随机 1 ~ maxRedu");
                     if (_options.Debug) sb.AppendLine($"            std::cerr << \"[Log] 当前格的值:\" << (int)buf[x][y] << \",随机到的值:\" << r << std::endl;");
                     sb.AppendLine($"            buf[x][y] -= (unsigned char)r;");
                     sb.AppendLine($"        }} else {{");
@@ -502,7 +512,6 @@ namespace sprh
                 }
                 return;
             }
-            // 否则当作十六进制立即数
             if ("0123456789abcdefABCDEF".Contains(param))
             {
                 sb.AppendLine($"    {{");
@@ -748,39 +757,72 @@ namespace sprh
 
         private void GenerateFileInstruction(StringBuilder sb, char param, int idx)
         {
+            char subCmd = param; // 原始参数
             if (_options.Debug)
-                sb.AppendLine($"    std::cerr << \"[Log] 执行文件操作，参数:\" << '{param}' << std::endl;");
+                sb.AppendLine($"    std::cerr << \"[Log] 执行文件操作，参数:\" << '{subCmd}' << std::endl;");
 
-            if (param == '+' || param == '-' || param == '*' || param == '/' || param == '=')
+            // 文件名追加/清除指令
+            if (subCmd == '<')
+            {
+                sb.AppendLine($"    input_filename += (char)buf[x][y];");
+                if (_options.Debug) sb.AppendLine($"    std::cerr << \"[Log] 已将\" << (int)buf[x][y] << \"添加到输入文件名，当前输入文件名:\" << input_filename << std::endl;");
+                return;
+            }
+            else if (subCmd == '>')
+            {
+                sb.AppendLine($"    output_filename += (char)buf[x][y];");
+                if (_options.Debug) sb.AppendLine($"    std::cerr << \"[Log] 已将\" << (int)buf[x][y] << \"添加到输出文件名，当前输出文件名:\" << output_filename << std::endl;");
+                return;
+            }
+            else if (subCmd == '[')
+            {
+                sb.AppendLine($"    input_filename.clear();");
+                if (_options.Debug) sb.AppendLine($"    std::cerr << \"[Log] 已清空输入文件名\" << std::endl;");
+                return;
+            }
+            else if (subCmd == ']')
+            {
+                sb.AppendLine($"    output_filename.clear();");
+                if (_options.Debug) sb.AppendLine($"    std::cerr << \"[Log] 已清空输出文件名\" << std::endl;");
+                return;
+            }
+
+            // 文件输入运算（+ - * / =）
+            if (subCmd == '+' || subCmd == '-' || subCmd == '*' || subCmd == '/' || subCmd == '=')
             {
                 sb.AppendLine($"    // 从输入文件读取一个字节");
-                sb.AppendLine($"    if (!fin.is_open()) fin.open(input_filename, std::ios::binary);");
-                sb.AppendLine($"    if (!fin) runtime_error(\"无法打开输入文件\", {idx}, 'F', '{param}');");
+                sb.AppendLine($"    // 如果文件名改变，重新打开文件流");
+                sb.AppendLine($"    if (!fin.is_open() || current_input_filename != input_filename) {{");
+                sb.AppendLine($"        if (fin.is_open()) fin.close();");
+                sb.AppendLine($"        fin.open(input_filename, std::ios::binary);");
+                sb.AppendLine($"        if (!fin) runtime_error(\"无法打开输入文件\", {idx}, 'F', '{subCmd}');");
+                sb.AppendLine($"        current_input_filename = input_filename;");
+                sb.AppendLine($"    }}");
                 sb.AppendLine($"    int b = fin.get();");
-                sb.AppendLine($"    if (b == EOF) runtime_error(\"文件已读完\", {idx}, 'F', '{param}');");
+                sb.AppendLine($"    if (b == EOF) runtime_error(\"文件已读完\", {idx}, 'F', '{subCmd}');");
                 sb.AppendLine($"    unsigned char val = (unsigned char)b;");
                 if (_options.Debug)
                     sb.AppendLine($"    std::cerr << \"[Log] 从文件读取的字节:\" << (int)val << std::endl;");
 
-                switch (param)
+                switch (subCmd)
                 {
                     case '+':
                         if (_options.Strict)
-                            sb.AppendLine($"    if ((int)buf[x][y] + val > 255) runtime_error(\"Char类型溢出\", {idx}, 'F', '{param}');");
+                            sb.AppendLine($"    if ((int)buf[x][y] + val > 255) runtime_error(\"Char类型溢出\", {idx}, 'F', '{subCmd}');");
                         sb.AppendLine($"    buf[x][y] += val;");
                         break;
                     case '-':
                         if (_options.Strict)
-                            sb.AppendLine($"    if ((int)buf[x][y] - val < 0) runtime_error(\"Char类型溢出\", {idx}, 'F', '{param}');");
+                            sb.AppendLine($"    if ((int)buf[x][y] - val < 0) runtime_error(\"Char类型溢出\", {idx}, 'F', '{subCmd}');");
                         sb.AppendLine($"    buf[x][y] -= val;");
                         break;
                     case '*':
                         if (_options.Strict)
-                            sb.AppendLine($"    if ((int)buf[x][y] * val > 255) runtime_error(\"Char类型溢出\", {idx}, 'F', '{param}');");
+                            sb.AppendLine($"    if ((int)buf[x][y] * val > 255) runtime_error(\"Char类型溢出\", {idx}, 'F', '{subCmd}');");
                         sb.AppendLine($"    buf[x][y] *= val;");
                         break;
                     case '/':
-                        sb.AppendLine($"    if (val == 0) runtime_error(\"0不能作为除数\", {idx}, 'F', '{param}');");
+                        sb.AppendLine($"    if (val == 0) runtime_error(\"0不能作为除数\", {idx}, 'F', '{subCmd}');");
                         sb.AppendLine($"    buf[x][y] /= val;");
                         break;
                     case '=':
@@ -789,32 +831,40 @@ namespace sprh
                 }
                 if (_options.Debug)
                     sb.AppendLine($"    std::cerr << \"[Log] 操作后当前单元格值:\" << (int)buf[x][y] << std::endl;");
+                return;
             }
-            else if (param == 'c' || param == 'C' || param == 'i' || param == 'I')
+
+            // 文件输出：c（字符）或 i（整数）
+            if (subCmd == 'c' || subCmd == 'C' || subCmd == 'i' || subCmd == 'I')
             {
-                bool isChar = (param == 'c' || param == 'C');
+                bool isChar = (subCmd == 'c' || subCmd == 'C');
                 sb.AppendLine($"    {{");
-                sb.AppendLine($"        std::ofstream fout(output_filename, std::ios::app);");
-                sb.AppendLine($"        if (!fout) runtime_error(\"无法打开输出文件\", {idx}, 'F', '{param}');");
+                sb.AppendLine($"        static std::ofstream fout;");
+                sb.AppendLine($"        static std::string last_output_filename;");
+                sb.AppendLine($"        if (!fout.is_open() || last_output_filename != output_filename) {{");
+                sb.AppendLine($"            if (fout.is_open()) fout.close();");
+                sb.AppendLine($"            fout.open(output_filename, std::ios::app);");
+                sb.AppendLine($"            if (!fout) runtime_error(\"无法打开输出文件\", {idx}, 'F', '{subCmd}');");
+                sb.AppendLine($"            last_output_filename = output_filename;");
+                sb.AppendLine($"        }}");
                 if (isChar)
                     sb.AppendLine($"        fout.put((char)buf[x][y]);");
                 else
                     sb.AppendLine($"        fout << (int)buf[x][y];");
-                sb.AppendLine($"        fout.close();");
+                sb.AppendLine($"        fout.flush();");
                 sb.AppendLine($"    }}");
                 if (_options.Debug)
                     sb.AppendLine($"    std::cerr << \"[Log] 已将值写入输出文件\" << std::endl;");
+                return;
             }
-            else
-            {
-                sb.AppendLine($"    runtime_error(\"未知的F参数\", {idx}, 'F', '{param}');");
-            }
+
+            // 未知参数
+            sb.AppendLine($"    runtime_error(\"未知的F参数\", {idx}, 'F', '{subCmd}');");
         }
 
         private bool IsHexInstruction(char cmd)
         {
             char lower = char.ToLower(cmd);
-            // 只保留 * / < >，移除了 u d l r + -
             return "*/<>".Contains(lower);
         }
     }
