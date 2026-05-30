@@ -1,6 +1,6 @@
 using System;
 
-namespace sprh
+namespace sprh.src.Libs
 {
     /// <summary>
     /// SPRH 运行时异常，用于替代 Environment.Exit，

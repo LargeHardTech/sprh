@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace sprh
+namespace sprh.src.Libs
 {
     internal class ConsoleAddon
     {

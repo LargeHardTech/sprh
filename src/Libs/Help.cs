@@ -1,6 +1,7 @@
-﻿using System;
+﻿using sprh.src;
+using System;
 
-namespace sprh
+namespace sprh.src.Libs
 {
     internal static class Help
     {

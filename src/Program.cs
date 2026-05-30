@@ -1,7 +1,8 @@
-﻿using System.Text;
+﻿using sprh.src.Libs;
+using System.Text;
 using System.Text.RegularExpressions;
 
-namespace sprh
+namespace sprh.src
 {
     internal class Program
     {

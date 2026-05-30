@@ -1,11 +1,11 @@
-﻿        using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
 
-namespace sprh
+namespace sprh.src.Libs
 {
     public class SprhToCppCompiler
     {

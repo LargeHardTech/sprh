@@ -3,7 +3,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace sprh
+namespace sprh.src.Libs
 {
 
     public static class SprhCommentRemover
