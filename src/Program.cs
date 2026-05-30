@@ -7,7 +7,7 @@ namespace sprh.src
     internal class Program
     {
         
-        public static string version = "2.1";
+        public static string version = "2.2";
         private static string filename = "";
         private static string filenametoconvert = "";
         //private static string inputfilename = "";
