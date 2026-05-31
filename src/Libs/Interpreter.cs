@@ -18,8 +18,8 @@ namespace sprh.src.Libs
         public bool strict { get; set; } = false;
         public int sleeptime { get; set; } = 100;
         public string filename { get; set; } = "";
-        public string inputfilename { get; set; } = "input.spri";
-        public string outputfilename { get; set; } = "output.spro";
+        public string inputfilename { get; set; } = "";
+        public string outputfilename { get; set; } = "";
 
 
         private static byte variable = 0;
