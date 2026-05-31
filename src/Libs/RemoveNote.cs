@@ -5,10 +5,8 @@ using System.Text.RegularExpressions;
 
 namespace sprh.src.Libs
 {
-
     public static class SprhCommentRemover
     {
-
         private static readonly Regex CommentRegex = new Regex(
             @"/\*.*?\*/", RegexOptions.Singleline | RegexOptions.Compiled);
 
@@ -27,9 +25,17 @@ namespace sprh.src.Libs
             string result = RemoveComments(code);
             if (alsoRemoveWhitespace)
             {
-                result = result.Replace("= ", "=" + SpacePlaceholder);
-                result = new string(result.Where(c => !char.IsWhiteSpace(c)).ToArray());
-                result = result.Replace(SpacePlaceholder, " ");
+                char[] chars = result.ToCharArray();
+                for (int i = 0; i < chars.Length - 1; i++)
+                {
+                    if (i % 2 == 0 && chars[i] == '=' && chars[i + 1] == ' ')
+                    {
+                        chars[i + 1] = SpacePlaceholder[0];
+                    }
+                }
+                string temp = new string(chars);
+                temp = new string(temp.Where(c => !char.IsWhiteSpace(c) || c == SpacePlaceholder[0]).ToArray());
+                result = temp.Replace(SpacePlaceholder, " ");
             }
             return result;
         }
