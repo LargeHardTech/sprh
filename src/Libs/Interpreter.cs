@@ -922,19 +922,19 @@ namespace sprh.src.Libs
                     }
                     if(subCmd == '<')
                     {
-                        inputfilename += buf[x, y];
+                        inputfilename += (char)buf[x, y];
                         if (debug)
                         {
-                            ca.log("将" + buf[x,y]+"添加到输入文件名");
+                            ca.log("将" + (char)buf[x,y]+"添加到输入文件名");
                             ca.Warn("当前输入文件名:"+inputfilename);
                         }
                     }
                     else if(subCmd == '>')
                     {
-                        outputfilename += buf[x, y];
+                        outputfilename += (char)buf[x, y];
                         if (debug)
                         {
-                            ca.log("将" + buf[x, y] + "添加到输出文件名");
+                            ca.log("将" + (char)buf[x, y] + "添加到输出文件名");
                             ca.Warn("当前输出文件名:" + outputfilename);
                         }
                     }
