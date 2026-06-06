@@ -1,7 +1,6 @@
 /*标题*/
-=Bpc=rpc=apc=ipc=npc=Fpc=upc=cpc=kpc= pc=Ipc=npc=tpc=epc=rpc=ppc=rpc=epc=tpc=epc=rpc--
+=Bpc=rpc=apc=ipc=npc=Fpc=upc=cpc=kpc=apc=Ipc=npc=tpc=epc=rpc=ppc=rpc=epc=tpc=epc=rpc--
 /*选择文件名*/
 =1F< =.F< =bF< =fF< --
 /*从1.bf读入文件*/
-D1 F=
-
+D1 F=F=

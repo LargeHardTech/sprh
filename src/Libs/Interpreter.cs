@@ -102,8 +102,15 @@ namespace sprh.src.Libs
             {
                 run();
             }
+            catch (SprhRuntimeException)
+            {
+                // error() 已经打印了 ca.Error 和 ca.Warn，
+                // 这里不再重复报告，直接静默退出
+                return;
+            }
             catch (Exception e)
             {
+                // 非 SPRH 异常（如空引用等未预期错误）
                 if (debug)
                 {
                     ca.Warn("程序发生异常!");
@@ -598,6 +605,22 @@ namespace sprh.src.Libs
                             }
 
                         }
+                        else if (op[i + 1] == '}')
+                        {
+                            if (debug)
+                            {
+                                ca.log("该条指令为{跳转指令的标记");
+                            }
+
+                        }
+                        else if(op[i + 1] == ')')
+                        {
+                            if (debug)
+                            {
+                                ca.log("该条指令为(跳转指令的标记");
+                            }
+
+                        }
                         else
                         {
                             error("在执行\"" + op[i] + op[i + 1] + "\"时出错,原因:参数"
@@ -1018,9 +1041,14 @@ namespace sprh.src.Libs
                                 ca.log("当前文件流位置:"+inputFileStream.Position.ToString());
                             }
                         }
-                        catch (Exception ex)
+                        catch (SprhRuntimeException)
                         {
-                            error("在执行\"" + op[i] + op[i + 1] + "\"时出错,原因:文件操作异常 - " + ex.Message, i);
+                            // 让 SPRH 异常继续向上传播，由 error() / r() 统一处理
+                            throw;
+                        }
+                        catch (Exception)
+                        {
+                            // 忽略文件流级别的非致命异常（如临时锁文件），继续执行
                         }
                     }
                     else if (subCmd == 'c' || subCmd == 'C' || subCmd == 'i' || subCmd == 'I')
@@ -1050,6 +1078,11 @@ namespace sprh.src.Libs
                             {
                                 ca.log("已将值写入输出文件");
                             }
+                        }
+                        catch (SprhRuntimeException)
+                        {
+                            // 让 SPRH 异常继续向上传播
+                            throw;
                         }
                         catch (Exception ex)
                         {

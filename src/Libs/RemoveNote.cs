@@ -10,13 +10,10 @@ namespace sprh.src.Libs
         private static readonly Regex CommentRegex = new Regex(
             @"/\*.*?\*/", RegexOptions.Singleline | RegexOptions.Compiled);
 
-        private const string SpacePlaceholder = "\u0001";
-
         public static string RemoveComments(string code)
         {
             if (string.IsNullOrEmpty(code))
                 return code;
-
             return CommentRegex.Replace(code, "");
         }
 
@@ -25,17 +22,27 @@ namespace sprh.src.Libs
             string result = RemoveComments(code);
             if (alsoRemoveWhitespace)
             {
-                char[] chars = result.ToCharArray();
-                for (int i = 0; i < chars.Length - 1; i++)
+                var sb = new StringBuilder();
+                for (int i = 0; i < result.Length; i++)
                 {
-                    if (i % 2 == 0 && chars[i] == '=' && chars[i + 1] == ' ')
+                    char c = result[i];
+                    if (c == ' ')
                     {
-                        chars[i + 1] = SpacePlaceholder[0];
+                        // 只有当空格在奇数位（参数位置），且前一位是 '='（赋值指令）时才保留
+                        if (i % 2 == 1 && i > 0 && result[i - 1] == '=')
+                        {
+                            sb.Append(c);
+                        }
+                        // 否则这个空格（包括命令行、分隔用的空格）都被忽略
                     }
+                    else if (!char.IsWhiteSpace(c))
+                    {
+                        // 非空白字符直接保留，同时丢弃换行、制表等其他空白字符
+                        sb.Append(c);
+                    }
+                    // 其他空白字符一律不保留
                 }
-                string temp = new string(chars);
-                temp = new string(temp.Where(c => !char.IsWhiteSpace(c) || c == SpacePlaceholder[0]).ToArray());
-                result = temp.Replace(SpacePlaceholder, " ");
+                result = sb.ToString();
             }
             return result;
         }
